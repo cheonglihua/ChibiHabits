@@ -1,0 +1,155 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Global Safety Net & Helpers
+    // ===============================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+        (request.auth.token.email == "cheonglihua520@gmail.com" && isEmailVerified())
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isBuddy(userDocId) {
+      // Check if userDocId is the buddy of the current user
+      let currentUser = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userDocId == currentUser.get('buddyId', '') || userDocId in currentUser.get('friends', []);
+    }
+
+    function isPotentialBuddy(userDocId) {
+      let currentUser = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userDocId in currentUser.get('buddyRequestsSent', []) || userDocId in currentUser.get('buddyRequestsReceived', []);
+    }
+
+    // ===============================================================
+    // Validation Schemas
+    // ===============================================================
+
+    function isValidUser(data) {
+      let fields = data.keys();
+      return fields.hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('character' in data) || (data.character in ['chiikawa', 'hachiware', 'usagi'])) &&
+             (!('petLevel' in data) || (data.petLevel is number && data.petLevel >= 1)) &&
+             (!('petExp' in data) || (data.petExp is number && data.petExp >= 0)) &&
+             (!('role' in data) || (data.role in ['admin', 'user']));
+    }
+
+    function isValidHabit(data) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'icon', 'color', 'createdAt', 'schedule', 'isShared', 'streak', 'type', 'repeatType', 'timeOfDay']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.icon is string && data.icon.size() <= 50 &&
+             data.createdAt is string && data.createdAt.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$") &&
+             data.streak is number && data.streak >= 0;
+    }
+
+    function isValidCheckIn(data) {
+      return data.keys().hasAll(['id', 'habitId', 'userId', 'date', 'completed']) &&
+             data.id is string &&
+             data.userId == request.auth.uid &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.completed is bool;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['id', 'fromUid', 'toUid', 'text', 'createdAt']) &&
+             data.fromUid == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000;
+    }
+
+    function isValidNudge(data) {
+      return data.keys().hasAll(['id', 'fromUid', 'toUid', 'createdAt', 'type']) &&
+             data.fromUid == request.auth.uid &&
+             data.type in ['cheer', 'reminder'];
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isBuddy(userId) || isPotentialBuddy(userId));
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().get('role', 'user') == 'user';
+      allow update: if isSignedIn() && (
+        (isOwner(userId) && isValidUser(incoming()) && incoming().get('role', 'user') == existing().get('role', 'user')) ||
+        isAdmin() ||
+        // Action: Receive Buddy Request
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['buddyRequestsReceived']) &&
+          incoming().buddyRequestsReceived.hasAll(existing().get('buddyRequestsReceived', [])) &&
+          request.auth.uid in incoming().buddyRequestsReceived
+        ) ||
+        // Action: Accept Buddy Request (as the original sender)
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['friends', 'buddyId', 'buddyRequestsSent']) &&
+          request.auth.uid in incoming().friends &&
+          incoming().buddyId == request.auth.uid &&
+          !(request.auth.uid in incoming().buddyRequestsSent)
+        )
+      );
+    }
+
+    match /habits/{habitId} {
+      allow read: if isSignedIn() && (isOwner(existing().userId) || isAdmin() || (isBuddy(existing().userId) && existing().isShared == true));
+      allow create: if isSignedIn() && isValidId(habitId) && isValidHabit(incoming());
+      allow update: if isSignedIn() && isOwner(existing().userId) && isValidHabit(incoming()) && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && isOwner(existing().userId);
+    }
+
+    match /checkins/{checkinId} {
+      allow read: if isSignedIn() && (isOwner(existing().userId) || isAdmin() || isBuddy(existing().userId));
+      allow create: if isSignedIn() && isValidId(checkinId) && isValidCheckIn(incoming());
+      allow update: if isSignedIn() && isOwner(existing().userId) && isValidCheckIn(incoming()) && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && isOwner(existing().userId);
+    }
+
+    match /messages/{messageId} {
+      allow read: if isSignedIn() && (isOwner(existing().fromUid) || isOwner(existing().toUid) || isAdmin());
+      allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming());
+      allow update, delete: if false; // Messages are immutable
+    }
+
+    match /nudges/{nudgeId} {
+      allow read: if isSignedIn() && (isOwner(existing().fromUid) || isOwner(existing().toUid) || isAdmin());
+      allow create: if isSignedIn() && isValidId(nudgeId) && isValidNudge(incoming());
+      allow update, delete: if false;
+    }
+  }
+}

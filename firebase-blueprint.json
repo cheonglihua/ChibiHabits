@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information, including their buddy, pet status, and town state.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "displayName": { "type": "string", "description": "The user's display name." },
+        "photoURL": { "type": "string", "format": "uri", "description": "The user's profile photo URL." },
+        "buddyId": { "type": "string", "description": "The UID of the user's current mutual buddy." },
+        "friends": { "type": "array", "items": { "type": "string" }, "description": "List of buddy UIDs." },
+        "buddyRequestsSent": { "type": "array", "items": { "type": "string" }, "description": "UIDs of users sent buddy requests to." },
+        "buddyRequestsReceived": { "type": "array", "items": { "type": "string" }, "description": "UIDs of users received buddy requests from." },
+        "character": { "type": "string", "enum": ["chiikawa", "hachiware", "usagi"], "description": "The user's chosen character." },
+        "petExp": { "type": "number", "description": "The pet's experience points." },
+        "petLevel": { "type": "number", "description": "The pet's level." },
+        "treats": { "type": "number", "description": "The number of treats owned." },
+        "happiness": { "type": "number", "description": "The pet's happiness (0-100)." },
+        "energy": { "type": "number", "description": "The pet's energy (0-100)." },
+        "health": { "type": "number", "description": "The pet's health (0-100)." },
+        "coins": { "type": "number", "description": "The user's coins." },
+        "equippedHat": { "type": "string", "description": "The ID of the equipped hat." },
+        "equippedFace": { "type": "string", "description": "The ID of the equipped face item." },
+        "equippedClothing": { "type": "string", "description": "The ID of the equipped clothing." },
+        "equippedHand": { "type": "string", "description": "The ID of the equipped hand item." },
+        "equippedBack": { "type": "string", "description": "The ID of the equipped back item." },
+        "equippedVehicle": { "type": "string", "description": "The ID of the equipped vehicle." },
+        "equippedWallpaper": { "type": "string", "description": "The ID of the equipped wallpaper." },
+        "lastDecayCheck": { "type": "string", "format": "date", "description": "The date of the last decay check (YYYY-MM-DD)." },
+        "nudgesSentToday": { "type": "number", "description": "Count of nudges sent by the user today." },
+        "lastNudgeSentAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last nudge sent." },
+        "lastActive": { "type": "string", "format": "date-time", "description": "Last active timestamp." },
+        "lastHabitLoggedAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last habit logged." },
+        "lastHabitName": { "type": "string", "description": "Name of the last habit logged." },
+        "townX": { "type": "number", "description": "User's X coordinate in town." },
+        "townY": { "type": "number", "description": "User's Y coordinate in town." },
+        "townAction": { "type": "string", "enum": ["wave", "cheer", "habit", "idle", "cheered", "nudge", "gift", "mahjong"], "description": "Current town action." },
+        "townActionAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last town action." },
+        "townActionTarget": { "type": "string", "description": "UID of the target for the town action." },
+        "coopStreak": { "type": "number", "description": "Cooperative habit streak." },
+        "inventory": { "type": "array", "items": { "type": "string" }, "description": "List of user's inventory items." },
+        "mahjongToken": { "type": "number", "description": "Count of mahjong tokens." },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "The user's role." },
+        "fcmToken": { "type": "string", "description": "The Firebase Cloud Messaging token for notifications." }
+      },
+      "required": ["uid", "email"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "Defines a habit that a user wants to build.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the habit." },
+        "userId": { "type": "string", "description": "The UID of the user who owns the habit." },
+        "name": { "type": "string", "description": "The name of the habit." },
+        "icon": { "type": "string", "description": "The icon representing the habit." },
+        "color": { "type": "string", "description": "The color associated with the habit." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The timestamp when the habit was created." },
+        "schedule": { "type": "array", "items": { "type": "string" }, "description": "Days/Patterns for the habit." },
+        "reminderTime": { "type": "string", "description": "Time of day for the reminder (HH:mm)." },
+        "isReminderEnabled": { "type": "boolean", "description": "Whether reminders are enabled." },
+        "category": { "type": "string", "description": "Optional category for the habit." },
+        "isShared": { "type": "boolean", "description": "Whether the habit is shared with the buddy." },
+        "streak": { "type": "number", "description": "Current consecutive days the habit has been completed." },
+        "lastCheckInDate": { "type": "string", "format": "date", "description": "The date of the last successful check-in." },
+        "type": { "type": "string", "enum": ["regular", "one-time"], "description": "The type of habit." },
+        "repeatType": { "type": "string", "enum": ["daily", "weekly"], "description": "The frequency of the habit." },
+        "habitTime": { "type": "string", "description": "Target time for the habit (HH:mm)." },
+        "timeOfDay": { "type": "string", "enum": ["morning", "afternoon", "evening", "all-day"], "description": "Preferred time of day." },
+        "endDate": { "type": "string", "format": "date", "description": "Optional end date." },
+        "endType": { "type": "string", "enum": ["date", "days", "never"], "description": "How the habit completion goal is defined." },
+        "endDays": { "type": "number", "description": "Number of days until the habit ends." },
+        "skippedDates": { "type": "array", "items": { "type": "string" }, "description": "Dates the habit was skipped (YYYY-MM-DD)." },
+        "oneTimeDate": { "type": "string", "format": "date", "description": "Specific date for a one-time task." }
+      },
+      "required": ["id", "userId", "name", "icon", "color", "createdAt", "schedule", "isShared", "streak", "type", "repeatType", "timeOfDay"]
+    },
+    "CheckIn": {
+      "title": "Check-In",
+      "description": "Records a user's progress on a habit for a specific date.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the check-in." },
+        "habitId": { "type": "string", "description": "The ID of the habit being checked in." },
+        "userId": { "type": "string", "description": "The UID of the user who performed the check-in." },
+        "date": { "type": "string", "format": "date", "description": "The date of the check-in (YYYY-MM-DD)." },
+        "completed": { "type": "boolean", "description": "Whether the habit was completed on this date." }
+      },
+      "required": ["id", "habitId", "userId", "date", "completed"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message between two buddies.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the message." },
+        "fromUid": { "type": "string", "description": "The UID of the sender." },
+        "toUid": { "type": "string", "description": "The UID of the recipient." },
+        "text": { "type": "string", "description": "The content of the message." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The timestamp when the message was sent." }
+      },
+      "required": ["id", "fromUid", "toUid", "text", "createdAt"]
+    },
+    "Nudge": {
+      "title": "Nudge",
+      "description": "A gentle notification sent to a buddy.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier for the nudge." },
+        "fromUid": { "type": "string", "description": "The UID of the sender." },
+        "toUid": { "type": "string", "description": "The UID of the recipient." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The timestamp when the nudge was sent." },
+        "type": { "type": "string", "enum": ["cheer", "reminder"], "description": "The type of nudge." }
+      },
+      "required": ["id", "fromUid", "toUid", "createdAt", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/habits/{habitId}": {
+      "schema": "Habit",
+      "description": "Habit documents."
+    },
+    "/checkins/{checkinId}": {
+      "schema": "CheckIn",
+      "description": "Check-in documents."
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Chat message documents."
+    },
+    "/nudges/{nudgeId}": {
+      "schema": "Nudge",
+      "description": "Nudge documents."
+    }
+  }
+}

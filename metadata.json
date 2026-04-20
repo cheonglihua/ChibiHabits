@@ -1,0 +1,7 @@
+{
+  "name": "ChibiHabits_Lihua_deploy",
+  "description": "A cute micro-habit builder with Chiikawa friends",
+  "requestFramePermissions": [
+    "notifications"
+  ]
+}
