@@ -12,7 +12,7 @@ createRoot(document.getElementById('root')!).render(
 // Register Service Worker for PWA / Notifications
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    navigator.serviceWorker.register('/firebase-messaging-sw.generated.js')
       .then(reg => console.log('SW registered:', reg))
       .catch(err => console.error('SW registration failed:', err));
   });

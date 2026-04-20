@@ -80,7 +80,7 @@ import {
 import { getToken } from 'firebase/messaging';
 import { useAuth, useFirestoreCollection, OperationType, handleFirestoreError } from './hooks/useFirebase';
 import { UserProfile, Habit, CheckIn, Message, Nudge } from './types';
-import chiikawaImage from './Remove background project.png';
+const chiikawaImage = '/chiikawa-v5.png';
 import { playClickSound, playSuccessSound, playNotificationSound, playHappySound, playEatSound } from './utils/sounds';
 
 const characterThemes = {
@@ -1455,14 +1455,15 @@ function LoginScreen() {
                   repeat: Infinity, 
                   ease: "easeInOut"
                 }}
-                className="w-72 h-48 mb-10 relative flex justify-center items-center"
+                className="w-80 h-64 mb-6 relative flex justify-center items-center"
               >
-                <div className={`absolute inset-0 ${theme.accent}/10 blur-3xl rounded-full scale-150`} />
+                <div className={`absolute inset-0 ${theme.accent}/10 blur-3xl rounded-full`} />
                 <img 
                   src={chiikawaImage} 
-                  className="w-full h-full object-contain drop-shadow-2xl relative z-10 scale-150 mb-[-36px]"
+                  className="w-64 h-56 object-contain drop-shadow-2xl relative z-10"
                   alt="Chiikawa"
                   referrerPolicy="no-referrer"
+                  style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
                 <motion.div 
                   animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
