@@ -2,6 +2,10 @@
 
 ChibiHabits is a gamified habit tracker inspired by Chiikawa. Build routines, level up your companion, and stay accountable with your buddy.
 
+## Live App
+
+https://chibihabits.web.app
+
 ## Features
 
 - Gamified habit tracking with EXP and coins
@@ -64,6 +68,8 @@ App runs at `http://localhost:3000`.
 ## Deployment
 
 ### Firebase Hosting
+
+Production URL: https://chibihabits.web.app
 
 ```bash
 npm run build
