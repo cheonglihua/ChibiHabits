@@ -3,7 +3,6 @@ import {
   collection, 
   query, 
   where, 
-  documentId,
   onSnapshot, 
   doc, 
   setDoc, 
@@ -22,6 +21,7 @@ import {
   arrayRemove
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { 
   Plus, 
   Check, 
@@ -78,7 +78,7 @@ import {
   fetchSignInMethodsForEmail,
   GoogleAuthProvider
 } from './firebase';
-import { getToken } from 'firebase/messaging';
+import { deleteToken, getToken, onMessage } from 'firebase/messaging';
 import { useAuth, useFirestoreCollection, OperationType, handleFirestoreError } from './hooks/useFirebase';
 import { UserProfile, Habit, CheckIn, Message, Nudge } from './types';
 const chiikawaImage = '/chiikawa-v5.png';
@@ -152,10 +152,25 @@ const CHARACTER_IMAGES = {
 
 const AppleHoodSVG = () => (
   <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md absolute top-0 left-0 pointer-events-none z-20" style={{ transform: 'scale(1.4) translateY(-10%)' }}>
-    <path d="M 10 50 C 10 10, 90 10, 90 50 C 90 80, 70 95, 50 95 C 30 95, 10 80, 10 50 Z" fill="#ef4444" stroke="#7f1d1d" strokeWidth="4" />
-    <path d="M 50 15 Q 60 5 70 10" fill="none" stroke="#15803d" strokeWidth="6" strokeLinecap="round" />
-    <path d="M 50 15 Q 40 5 30 10" fill="none" stroke="#15803d" strokeWidth="6" strokeLinecap="round" />
-    <circle cx="50" cy="50" r="35" fill="transparent" stroke="#fca5a5" strokeWidth="8" strokeDasharray="10 10" />
+    <defs>
+      <linearGradient id="appleHoodBody" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#fb7185" />
+        <stop offset="100%" stopColor="#e11d48" />
+      </linearGradient>
+      <linearGradient id="appleHoodLeaf" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#86efac" />
+        <stop offset="100%" stopColor="#16a34a" />
+      </linearGradient>
+    </defs>
+    <path d="M 22 44 C 22 22, 35 10, 50 10 C 65 10, 78 22, 78 44 C 78 58, 72 70, 66 78 C 60 86, 55 92, 50 92 C 45 92, 40 86, 34 78 C 28 70, 22 58, 22 44 Z" fill="url(#appleHoodBody)" stroke="#991b1b" strokeWidth="3.5" />
+    <path d="M 50 11 C 52 7, 58 4, 64 6" fill="none" stroke="#166534" strokeWidth="5" strokeLinecap="round" />
+    <path d="M 51 11 C 47 7, 41 4, 35 7" fill="none" stroke="#166534" strokeWidth="5" strokeLinecap="round" />
+    <ellipse cx="63" cy="8" rx="7" ry="4" fill="url(#appleHoodLeaf)" transform="rotate(20 63 8)" />
+    <ellipse cx="37" cy="8" rx="7" ry="4" fill="url(#appleHoodLeaf)" transform="rotate(-18 37 8)" />
+    <path d="M 31 45 C 31 31, 39 24, 50 24 C 61 24, 69 31, 69 45 C 69 54, 65 62, 60 68 C 56 72, 53 75, 50 75 C 47 75, 44 72, 40 68 C 35 62, 31 54, 31 45 Z" fill="#fecdd3" opacity="0.95" />
+    <circle cx="40" cy="49" r="2.6" fill="#7f1d1d" />
+    <circle cx="60" cy="49" r="2.6" fill="#7f1d1d" />
+    <path d="M 43 58 Q 50 63 57 58" fill="none" stroke="#7f1d1d" strokeWidth="2.4" />
   </svg>
 );
 
@@ -207,13 +222,6 @@ const StrawHatSVG = () => (
     <ellipse cx="50" cy="65" rx="45" ry="15" fill="#fde047" stroke="#422006" strokeWidth="3" />
     <path d="M 20 60 C 20 20, 80 20, 80 60 Z" fill="#fef08a" stroke="#422006" strokeWidth="3" />
     <path d="M 21 55 Q 50 65 79 55 L 80 60 Q 50 70 20 60 Z" fill="#4ade80" stroke="#422006" strokeWidth="2" />
-    <g transform="translate(70, 45) scale(0.8)">
-      <circle cx="0" cy="0" r="15" fill="#fbbf24" stroke="#422006" strokeWidth="2" />
-      <circle cx="0" cy="0" r="5" fill="#422006" />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map(angle => (
-        <ellipse key={angle} cx="0" cy="-15" rx="4" ry="8" fill="#fef08a" stroke="#422006" strokeWidth="1" transform={`rotate(${angle})`} />
-      ))}
-    </g>
   </svg>
 );
 
@@ -227,27 +235,23 @@ const SuitSVG = () => (
   </svg>
 );
 
-const GuitarSVG = () => (
-  <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md absolute top-0 left-0 pointer-events-none z-30" style={{ transform: 'scale(1.3) translateY(20%) translateX(10%)' }}>
-    <rect x="40" y="30" width="40" height="6" fill="#fcd34d" stroke="#422006" strokeWidth="2" transform="rotate(-20 40 30)" />
-    <path d="M 20 60 C 10 40, 40 30, 50 50 C 60 70, 30 80, 20 60 Z" fill="#1f2937" stroke="#000000" strokeWidth="3" />
-    <path d="M 25 55 C 20 45, 35 40, 40 50 C 45 60, 30 65, 25 55 Z" fill="#ffffff" stroke="#000000" strokeWidth="1" />
-    <rect x="75" y="15" width="15" height="10" fill="#fcd34d" stroke="#422006" strokeWidth="2" transform="rotate(-20 75 15)" rx="2" />
-  </svg>
-);
+const ITEM_PREVIEWS: Record<string, React.ReactNode> = {
+};
 
 const ITEM_COMPONENTS: Record<string, React.ReactNode> = {
-  apple_hood: <AppleHoodSVG />,
   butterfly_wings: <ButterflyWingsSVG />,
   motorcycle: <MotorcycleSVG />,
   book_stack: <BookStackHatSVG />,
   glasses: <GlassesSVG />,
   straw_hat: <StrawHatSVG />,
   suit: <SuitSVG />,
-  guitar: <GuitarSVG />,
 };
 
 const LayeredAvatar = ({ character, equippedHat, equippedFace, equippedClothing, equippedHand, equippedBack, equippedVehicle, isEating, className = "w-12 h-12" }: { character: string, equippedHat?: string, equippedFace?: string, equippedClothing?: string, equippedHand?: string, equippedBack?: string, equippedVehicle?: string, isEating?: boolean, className?: string }) => {
+  const getSpecialWrapperClass = (itemId?: string, slot?: 'hat' | 'hand' | 'face' | 'clothing' | 'back' | 'vehicle') => {
+    return 'absolute inset-0 pointer-events-none';
+  };
+
   return (
     <div className={`relative ${className}`}>
       {equippedBack && ITEM_COMPONENTS[equippedBack] && (
@@ -280,17 +284,17 @@ const LayeredAvatar = ({ character, equippedHat, equippedFace, equippedClothing,
         referrerPolicy="no-referrer"
       />
       {equippedFace && ITEM_COMPONENTS[equippedFace] && (
-        <div className="absolute inset-0 z-20 pointer-events-none">
+        <div className={getSpecialWrapperClass(equippedFace, 'face')}>
           {ITEM_COMPONENTS[equippedFace]}
         </div>
       )}
       {equippedHand && ITEM_COMPONENTS[equippedHand] && (
-        <div className="absolute inset-0 z-25 pointer-events-none">
+        <div className={getSpecialWrapperClass(equippedHand, 'hand')}>
           {ITEM_COMPONENTS[equippedHand]}
         </div>
       )}
       {equippedHat && (
-        <div className="absolute inset-0 z-20 pointer-events-none">
+        <div className={getSpecialWrapperClass(equippedHat, 'hat')}>
           {ITEM_COMPONENTS[equippedHat] || (
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-2xl">
               {equippedHat === 'party_hat' ? '🥳' : equippedHat === 'crown' ? '👑' : equippedHat}
@@ -334,7 +338,7 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends Component<any, any> {
-  state = { hasError: false, error: null };
+  state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -347,11 +351,14 @@ class ErrorBoundary extends Component<any, any> {
   render() {
     if (this.state.hasError) {
       let errorMessage = "Something went wrong.";
+      const rawMessage = this.state.error instanceof Error
+        ? this.state.error.message
+        : String(this.state.error ?? '');
       try {
-        const parsedError = JSON.parse(this.state.error.message);
+        const parsedError = JSON.parse(rawMessage);
         errorMessage = `Firestore Error: ${parsedError.operationType} on ${parsedError.path} failed. ${parsedError.error}`;
       } catch (e) {
-        errorMessage = this.state.error?.message || String(this.state.error);
+        errorMessage = rawMessage || "Something went wrong.";
       }
 
       return (
@@ -697,7 +704,6 @@ function CharacterSelectionScreen({ user, onComplete, onError }: { user: any, on
     const newProfile: UserProfile = {
       uid: user.uid,
       email: user.email || '',
-      emailLower: (user.email || '').trim().toLowerCase(),
       displayName: initialDisplayName,
       photoURL: user.photoURL || '',
       petExp: 0,
@@ -706,18 +712,6 @@ function CharacterSelectionScreen({ user, onComplete, onError }: { user: any, on
     };
     try {
       await setDoc(doc(db, 'users', user.uid), newProfile);
-      if (newProfile.emailLower) {
-        await setDoc(doc(db, 'userDirectory', user.uid), {
-          uid: user.uid,
-          email: newProfile.email,
-          emailLower: newProfile.emailLower,
-          displayName: newProfile.displayName || initialDisplayName,
-          photoURL: newProfile.photoURL || '',
-          character: newProfile.character,
-          petLevel: newProfile.petLevel,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'users');
       onError();
@@ -807,46 +801,39 @@ function AppContent() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+
+    const rawValue = window.localStorage.getItem('chibihabits.unreadNotificationCount');
+    const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : 0;
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+  });
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    () => {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        return false;
+      }
+
+      if (Notification.permission !== 'granted') {
+        return false;
+      }
+
+      return window.localStorage.getItem('chibihabits.notificationsEnabled') !== 'false';
+    }
+  );
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showLogoutWarning, setShowLogoutWarning] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
-  const toastTimeoutRef = useRef<number | null>(null);
-  const activeTabRef = useRef(activeTab);
-
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
+  const fcmVapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
   const handleLinkAccount = async () => {
     if (!user) return;
     setIsLinking(true);
     try {
       const provider = new GoogleAuthProvider();
-      const linked = await linkWithPopup(user, provider);
-      const linkedEmail = linked.user.email || user.email || '';
-      const normalizedEmail = linkedEmail.trim().toLowerCase();
-
-      if (normalizedEmail) {
-        await updateDoc(doc(db, 'users', user.uid), {
-          email: linkedEmail,
-          emailLower: normalizedEmail
-        });
-
-        await setDoc(doc(db, 'userDirectory', user.uid), {
-          uid: user.uid,
-          email: linkedEmail,
-          emailLower: normalizedEmail,
-          displayName: linked.user.displayName || userProfile?.displayName || normalizedEmail.split('@')[0],
-          photoURL: linked.user.photoURL || userProfile?.photoURL || '',
-          character: userProfile?.character || 'chiikawa',
-          petLevel: userProfile?.petLevel || 1,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
-
+      await linkWithPopup(user, provider);
       showToast('Account linked successfully! 💖', 'success');
       setShowLogoutWarning(false);
     } catch (err: any) {
@@ -862,58 +849,9 @@ function AppContent() {
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    if (toastTimeoutRef.current) {
-      window.clearTimeout(toastTimeoutRef.current);
-    }
     setToast({ message, type });
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setToast(null);
-      toastTimeoutRef.current = null;
-    }, 3000);
+    setTimeout(() => setToast(null), 3000);
   };
-
-  useEffect(() => {
-    return () => {
-      if (toastTimeoutRef.current) {
-        window.clearTimeout(toastTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!user || !userProfile) return;
-
-    const profileEmail = userProfile.email || user.email || '';
-    const normalizedEmail = profileEmail.trim().toLowerCase();
-    if (!normalizedEmail) return;
-
-    const syncDirectory = async () => {
-      try {
-        await setDoc(doc(db, 'userDirectory', user.uid), {
-          uid: user.uid,
-          email: profileEmail,
-          emailLower: normalizedEmail,
-          displayName: userProfile.displayName || user.displayName || normalizedEmail.split('@')[0],
-          photoURL: userProfile.photoURL || user.photoURL || '',
-          character: userProfile.character || 'chiikawa',
-          petLevel: userProfile.petLevel || 1,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-
-        if (userProfile.emailLower !== normalizedEmail || userProfile.email !== profileEmail) {
-          await updateDoc(doc(db, 'users', user.uid), {
-            email: profileEmail,
-            emailLower: normalizedEmail
-          });
-        }
-      } catch (err) {
-        // Directory sync should not block core app behavior.
-        console.error('Failed to sync user directory', err);
-      }
-    };
-
-    syncDirectory();
-  }, [user, userProfile]);
 
   const { data: habits, loading: habitsLoading } = useFirestoreCollection<Habit>('habits', useMemo(() => user?.uid ? [where('userId', '==', user.uid)] : [], [user?.uid]), !!user);
   const { today, yesterday, ninetyDaysAgo } = useToday();
@@ -922,6 +860,29 @@ function AppContent() {
   const checkins = useMemo(() => {
     return allCheckins.filter(c => c.date >= ninetyDaysAgo);
   }, [allCheckins, ninetyDaysAgo]);
+
+  useEffect(() => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted' && notificationsEnabled) {
+      setNotificationsEnabled(false);
+    }
+  }, [notificationsEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('localStorage' in window)) return;
+    window.localStorage.setItem('chibihabits.notificationsEnabled', String(notificationsEnabled));
+  }, [notificationsEnabled]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('localStorage' in window)) return;
+    window.localStorage.setItem('chibihabits.unreadNotificationCount', String(unreadNotificationCount));
+  }, [unreadNotificationCount]);
+
+  useEffect(() => {
+    if (activeTab === 'settings' && unreadNotificationCount > 0) {
+      setUnreadNotificationCount(0);
+    }
+  }, [activeTab, unreadNotificationCount]);
 
   // --- Presence System ---
   useEffect(() => {
@@ -945,40 +906,90 @@ function AppContent() {
 
   // --- Notification System ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || !notificationsEnabled || !('Notification' in window)) return;
 
-    const canUseBrowserNotifications = 'Notification' in window;
-    if (notificationsEnabled && canUseBrowserNotifications && Notification.permission === 'default') {
+    // Request permission if not granted
+    if (Notification.permission === 'default') {
       Notification.requestPermission().catch(console.error);
     }
 
-    let unsubscribeNudges = () => {};
-    let reminderInterval: ReturnType<typeof setInterval> | null = null;
+    // 1. Listen for Nudges
+    const nudgeQuery = query(
+      collection(db, 'nudges'), 
+      where('toUid', '==', user.uid)
+    );
 
-    if (notificationsEnabled) {
-      // 1. Listen for Nudges
-      const nudgeQuery = query(
-        collection(db, 'nudges'), 
-        where('toUid', '==', user.uid)
-      );
+    const now = new Date().toISOString();
+    const unsubscribeNudges = onSnapshot(nudgeQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const nudge = change.doc.data() as Nudge;
+          // Filter in memory to avoid index requirement
+          if (nudge.createdAt <= now) return;
 
-      const now = new Date().toISOString();
-      unsubscribeNudges = onSnapshot(nudgeQuery, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added') {
-            const nudge = change.doc.data() as Nudge;
-            // Filter in memory to avoid index requirement
-            if (nudge.createdAt <= now) return;
-            
+          if (activeTab !== 'settings') {
+            setUnreadNotificationCount((currentCount) => Math.min(currentCount + 1, 99));
+          }
+          
+          playNotificationSound();
+          if (Notification.permission === 'granted') {
+            const title = 'Buddy Nudge! ✨';
+            const options = {
+              body: nudge.type === 'cheer' ? "Your buddy is cheering you on! Keep it up! 💖" : "Your buddy sent you a gentle reminder! 🌸",
+              icon: '/favicon.ico',
+              badge: '/favicon.ico'
+            };
+
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, options);
+              });
+            } else {
+              new Notification(title, options);
+            }
+          }
+        }
+      });
+    });
+
+    // 2. Listen for Buddy Requests (via profile changes)
+    // This is already handled by the userProfile listener, but we can add a specific effect if we want a notification
+    
+    // 3. Habit Reminders (Local check every minute)
+    const reminderInterval = setInterval(() => {
+      const now = new Date();
+      const currentTime = format(now, 'HH:mm');
+      const timePlus30 = format(addMinutes(now, 30), 'HH:mm');
+      const todayDay = format(now, 'EEE'); // Mon, Tue...
+
+      habits.forEach(habit => {
+        // Check for exact reminder time OR 30 minutes before habitTime
+        const isReminderTime = habit.reminderTime === currentTime;
+        const is30MinBefore = habit.habitTime === timePlus30;
+
+        if (isReminderTime || is30MinBefore) {
+          const isScheduledToday = habit.schedule.includes('Every Day') || habit.schedule.includes(todayDay);
+          const isCompletedToday = checkins.some(c => c.habitId === habit.id && c.date === today && c.completed);
+
+          if (isScheduledToday && !isCompletedToday) {
+            if (activeTab !== 'settings') {
+              setUnreadNotificationCount((currentCount) => Math.min(currentCount + 1, 99));
+            }
+
             playNotificationSound();
-            if (canUseBrowserNotifications && Notification.permission === 'granted') {
-              const title = 'Buddy Nudge! ✨';
+            if (Notification.permission === 'granted') {
+              const title = is30MinBefore ? `Upcoming Habit: ${habit.name}` : `Habit Reminder: ${habit.name}`;
+              const body = is30MinBefore 
+                ? `Starts in 30 minutes! Get ready! 🌸` 
+                : "Time to keep your streak alive! Your buddy is watching! 🐾";
+
               const options = {
-                body: nudge.type === 'cheer' ? "Your buddy is cheering you on! Keep it up! 💖" : "Your buddy sent you a gentle reminder! 🌸",
+                body,
                 icon: '/favicon.ico',
                 badge: '/favicon.ico'
               };
 
+              // Try using service worker for more robust notifications
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.ready.then(registration => {
                   registration.showNotification(title, options);
@@ -988,122 +999,84 @@ function AppContent() {
               }
             }
           }
-        });
-      });
-    }
-
-    // 2. Listen for incoming buddy messages
-    const messageQuery = query(
-      collection(db, 'messages'),
-      where('toUid', '==', user.uid)
-    );
-
-    let isInitialMessageSnapshot = true;
-    const unsubscribeMessages = onSnapshot(messageQuery, (snapshot) => {
-      if (isInitialMessageSnapshot) {
-        isInitialMessageSnapshot = false;
-        return;
-      }
-
-      snapshot.docChanges().forEach((change) => {
-        if (change.type !== 'added') return;
-
-        const incoming = change.doc.data() as Message;
-        // If user is currently in chat tab, avoid double-noise.
-        if (activeTabRef.current === 'buddy') return;
-
-        playNotificationSound();
-        showToast('New buddy message received! 💬', 'info');
-
-        if (canUseBrowserNotifications && Notification.permission === 'granted') {
-          const title = 'New Buddy Message 💬';
-          const preview = incoming.text?.trim() || 'Open chat to read the message.';
-          const body = preview.length > 80 ? `${preview.slice(0, 80)}...` : preview;
-
-          const options = {
-            body,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico'
-          };
-
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(registration => {
-              registration.showNotification(title, options);
-            });
-          } else {
-            new Notification(title, options);
-          }
         }
       });
-    });
-
-    // 3. Listen for Buddy Requests (via profile changes)
-    // This is already handled by the userProfile listener, but we can add a specific effect if we want a notification
-    
-    // 4. Habit Reminders (Local check every minute)
-    if (notificationsEnabled) {
-      reminderInterval = setInterval(() => {
-        const now = new Date();
-        const currentTime = format(now, 'HH:mm');
-        const timePlus30 = format(addMinutes(now, 30), 'HH:mm');
-        const todayDay = format(now, 'EEE'); // Mon, Tue...
-
-        habits.forEach(habit => {
-          // Check for exact reminder time OR 30 minutes before habitTime
-          const isReminderTime = habit.reminderTime === currentTime;
-          const is30MinBefore = habit.habitTime === timePlus30;
-
-          if (isReminderTime || is30MinBefore) {
-            const isScheduledToday = habit.schedule.includes('Every Day') || habit.schedule.includes(todayDay);
-            const isCompleted = checkins.some(c => c.habitId === habit.id && c.completed);
-
-            if (isScheduledToday && !isCompleted) {
-              playNotificationSound();
-              if (canUseBrowserNotifications && Notification.permission === 'granted') {
-                const title = is30MinBefore ? `Upcoming Habit: ${habit.name}` : `Habit Reminder: ${habit.name}`;
-                const body = is30MinBefore 
-                  ? `Starts in 30 minutes! Get ready! 🌸` 
-                  : "Time to keep your streak alive! Your buddy is watching! 🐾";
-
-                const options = {
-                  body,
-                  icon: '/favicon.ico',
-                  badge: '/favicon.ico'
-                };
-
-                // Try using service worker for more robust notifications
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.ready.then(registration => {
-                    registration.showNotification(title, options);
-                  });
-                } else {
-                  new Notification(title, options);
-                }
-              }
-            }
-          }
-        });
-      }, 60000);
-    }
+    }, 60000);
 
     return () => {
       unsubscribeNudges();
-      unsubscribeMessages();
-      if (reminderInterval) {
-        clearInterval(reminderInterval);
-      }
+      clearInterval(reminderInterval);
     };
-  }, [user, notificationsEnabled, habits, checkins]);
+  }, [user, notificationsEnabled, habits, checkins, today, activeTab]);
+
+  // --- Foreground FCM Notifications ---
+  useEffect(() => {
+    if (!user || !notificationsEnabled || !messaging || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    const unsubscribe = onMessage(messaging, (payload) => {
+      if (activeTab !== 'settings') {
+        setUnreadNotificationCount((currentCount) => Math.min(currentCount + 1, 99));
+      }
+
+      playNotificationSound();
+
+      const title = payload.notification?.title || 'ChibiHabits';
+      const options = {
+        body: payload.notification?.body || 'You have a new update.',
+        icon: '/favicon.ico',
+        badge: '/favicon.ico'
+      };
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, options);
+        });
+      } else {
+        new Notification(title, options);
+      }
+    });
+
+    return unsubscribe;
+  }, [user, notificationsEnabled, activeTab]);
 
   // --- FCM Token Registration ---
   useEffect(() => {
-    if (!user || !notificationsEnabled || !messaging) return;
+    if (!user || !messaging || !('Notification' in window)) return;
 
-    const requestToken = async () => {
+    const syncToken = async () => {
+      const activeMessaging = messaging;
+      if (!activeMessaging) return;
+
+      if (!notificationsEnabled || Notification.permission !== 'granted') {
+        try {
+          await deleteToken(activeMessaging);
+        } catch (err) {
+          console.error('Failed to delete FCM token.', err);
+        }
+        try {
+          await updateDoc(doc(db, 'users', user.uid), { fcmToken: null });
+        } catch {
+          // Ignore write failures to avoid blocking local notifications.
+        }
+        return;
+      }
+
+      if (!fcmVapidKey) {
+        console.warn('Missing VITE_FIREBASE_VAPID_KEY. FCM push notifications are disabled.');
+        return;
+      }
+
       try {
-        const currentToken = await getToken(messaging, {
-          vapidKey: 'BPAq3J2-z2abW1q7qyM-AIzaSyA48XCbWp2fxq--' // This is a placeholder, user needs their real VAPID key
+        const registration = 'serviceWorker' in navigator
+          ? await navigator.serviceWorker.ready
+          : undefined;
+
+        const currentToken = await getToken(activeMessaging, {
+          vapidKey: fcmVapidKey,
+          serviceWorkerRegistration: registration
         });
+
         if (currentToken) {
           await updateDoc(doc(db, 'users', user.uid), {
             fcmToken: currentToken
@@ -1114,10 +1087,8 @@ function AppContent() {
       }
     };
 
-    if (Notification.permission === 'granted') {
-      requestToken();
-    }
-  }, [user, notificationsEnabled]);
+    syncToken();
+  }, [user, notificationsEnabled, fcmVapidKey]);
 
   // Fetch user profile
   useEffect(() => {
@@ -1301,7 +1272,7 @@ function AppContent() {
         <NavButton active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} icon={<BarChart3 size={24} />} label="Stats" theme={currentTheme} />
         <NavButton active={activeTab === 'town'} onClick={() => setActiveTab('town')} icon={<Map size={24} />} label="Town" theme={currentTheme} />
         <NavButton active={activeTab === 'buddy'} onClick={() => setActiveTab('buddy')} icon={<Users size={24} />} label="Buddy" theme={currentTheme} />
-        <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Smile size={24} />} label="Pet" theme={currentTheme} />
+        <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Smile size={24} />} label="Pet" theme={currentTheme} badgeCount={unreadNotificationCount} />
       </nav>
 
       {/* Add Habit Modal */}
@@ -1880,20 +1851,20 @@ function ChiikawaToast({ message, type, onClose }: { message: string, type: 'suc
 
   return (
     <motion.div
-      initial={{ y: -30, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: -30, opacity: 0 }}
-      className={`fixed top-6 left-1/2 -translate-x-1/2 z-[300] max-w-[92vw] px-6 py-3 rounded-full text-white font-black text-xs shadow-xl flex items-center gap-3 ${bgColors[type]}`}
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: -20, opacity: 1 }}
+      exit={{ y: 100, opacity: 0 }}
+      className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-full text-white font-black text-xs shadow-xl flex items-center gap-3 ${bgColors[type]}`}
     >
       {type === 'success' && <Check size={16} />}
       {type === 'error' && <X size={16} />}
       {type === 'info' && <Sparkles size={16} />}
-      <span>{message}</span>
+      <span className="whitespace-nowrap">{message}</span>
     </motion.div>
   );
 }
 
-function NavButton({ active, onClick, icon, label, theme, className = '' }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, theme: any, className?: string }) {
+function NavButton({ active, onClick, icon, label, theme, className = '', badgeCount = 0 }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, theme: any, className?: string, badgeCount?: number }) {
   const handleClick = () => {
     playClickSound();
     onClick();
@@ -1912,6 +1883,11 @@ function NavButton({ active, onClick, icon, label, theme, className = '' }: { ac
         {icon}
       </div>
       <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-tighter sm:tracking-widest">{label}</span>
+      {badgeCount > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center shadow-lg border-2 border-white">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      )}
     </button>
   );
 }
@@ -2313,7 +2289,6 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                 userId={user.uid}
                 userProfile={userProfile}
                 onEdit={setEditingHabit}
-                showToast={showToast}
                 theme={theme}
               />
             ))}
@@ -2328,7 +2303,6 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                     userId={user.uid}
                     userProfile={userProfile}
                     onEdit={setEditingHabit}
-                    showToast={showToast}
                     theme={theme}
                   />
                 ))}
@@ -2357,7 +2331,6 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                 userId={user.uid}
                 userProfile={userProfile}
                 onEdit={setEditingHabit}
-                showToast={showToast}
                 theme={theme}
               />
             ))}
@@ -2372,7 +2345,6 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                     userId={user.uid}
                     userProfile={userProfile}
                     onEdit={setEditingHabit}
-                    showToast={showToast}
                     theme={theme}
                   />
                 ))}
@@ -2651,14 +2623,12 @@ function InventoryPanel({ onClose, userProfile, userId, showToast, theme }: { on
     const items = [
       { id: 'party_hat', name: 'Party Hat', icon: '🥳', type: 'hat' },
       { id: 'crown', name: 'Crown', icon: '👑', type: 'hat' },
-      { id: 'apple_hood', name: 'Apple Hood', icon: '🍎', type: 'hat' },
       { id: 'butterfly_wings', name: 'Butterfly Wings', icon: '🦋', type: 'back' },
       { id: 'motorcycle', name: 'Motorcycle', icon: '🛵', type: 'vehicle' },
       { id: 'book_stack', name: 'Book Stack Hat', icon: '📚', type: 'hat' },
       { id: 'glasses', name: 'Glasses', icon: '👓', type: 'face' },
       { id: 'straw_hat', name: 'Straw Hat', icon: '👒', type: 'hat' },
       { id: 'suit', name: 'Suit', icon: '👔', type: 'clothing' },
-      { id: 'guitar', name: 'Guitar', icon: '🎸', type: 'hand' },
       { id: 'stars', name: 'Starry Sky', icon: '⭐', type: 'wallpaper' },
     ];
     
@@ -2712,13 +2682,13 @@ function InventoryPanel({ onClose, userProfile, userId, showToast, theme }: { on
 
     let alertMsg = '';
 
-    if (reward.type === 'coins') {
+    if (reward.type === 'coins' && typeof reward.amount === 'number') {
       updates.coins = (userProfile?.coins || 0) + reward.amount;
       alertMsg = `You opened a Gift Box and found ${reward.name}!`;
-    } else if (reward.type === 'treats') {
+    } else if (reward.type === 'treats' && typeof reward.amount === 'number') {
       updates.treats = (userProfile?.treats || 0) + reward.amount;
       alertMsg = `You opened a Gift Box and found ${reward.name}!`;
-    } else if (reward.type === 'item') {
+    } else if (reward.type === 'item' && reward.item) {
       if (!newInventory.includes(reward.item)) {
         updates.inventory.push(reward.item);
         alertMsg = `You opened a Gift Box and found a ${reward.item}!`;
@@ -2767,14 +2737,12 @@ function InventoryPanel({ onClose, userProfile, userId, showToast, theme }: { on
                   const items = [
                     { id: 'party_hat', name: 'Party Hat', icon: '🥳', type: 'hat' },
                     { id: 'crown', name: 'Crown', icon: '👑', type: 'hat' },
-                    { id: 'apple_hood', name: 'Apple Hood', icon: '🍎', type: 'hat' },
                     { id: 'butterfly_wings', name: 'Butterfly Wings', icon: '🦋', type: 'back' },
                     { id: 'motorcycle', name: 'Motorcycle', icon: '🛵', type: 'vehicle' },
                     { id: 'book_stack', name: 'Book Stack Hat', icon: '📚', type: 'hat' },
                     { id: 'glasses', name: 'Glasses', icon: '👓', type: 'face' },
                     { id: 'straw_hat', name: 'Straw Hat', icon: '👒', type: 'hat' },
                     { id: 'suit', name: 'Suit', icon: '👔', type: 'clothing' },
-                    { id: 'guitar', name: 'Guitar', icon: '🎸', type: 'hand' },
                     { id: 'stars', name: 'Starry Sky', icon: '⭐', type: 'wallpaper' },
                   ];
                   const itemDef = items.find(i => i.name === itemName);
@@ -2798,6 +2766,8 @@ function InventoryPanel({ onClose, userProfile, userId, showToast, theme }: { on
 
                   if (!itemDef) return null;
 
+                  const preview = ITEM_PREVIEWS[itemDef.id];
+
                   const isEquipped = (itemDef.type === 'hat' && equippedHat === itemDef.id) || 
                                      (itemDef.type === 'face' && equippedFace === itemDef.id) ||
                                      (itemDef.type === 'clothing' && equippedClothing === itemDef.id) ||
@@ -2809,7 +2779,9 @@ function InventoryPanel({ onClose, userProfile, userId, showToast, theme }: { on
                   return (
                     <div key={itemName} className={`flex items-center justify-between p-3 ${theme.bg} rounded-2xl border-2 ${theme.border}/20`}>
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{itemDef.icon}</span>
+                        <div className="w-12 h-12 shrink-0 rounded-2xl bg-white border border-black/5 flex items-center justify-center shadow-sm overflow-hidden">
+                          {preview || <span className="text-2xl leading-none">{itemDef.icon}</span>}
+                        </div>
                         <div>
                           <p className={`font-black text-sm ${theme.text}`}>{itemName}</p>
                           <p className={`text-[10px] font-bold ${theme.lightText} capitalize`}>{itemDef.type}</p>
@@ -2851,14 +2823,12 @@ function ShopCard({ userProfile, userId, theme }: { userProfile: UserProfile | n
     { id: 'toy', name: 'Squeaky Toy', icon: '🧸', cost: 50, desc: '+20 Happiness', type: 'food' },
     { id: 'party_hat', name: 'Party Hat', icon: '🥳', cost: 200, desc: 'Equippable Hat', type: 'hat' },
     { id: 'crown', name: 'Crown', icon: '👑', cost: 500, desc: 'Equippable Hat', type: 'hat' },
-    { id: 'apple_hood', name: 'Apple Hood', icon: '🍎', cost: 300, desc: 'Equippable Headpiece', type: 'hat' },
     { id: 'butterfly_wings', name: 'Butterfly Wings', icon: '🦋', cost: 400, desc: 'Equippable Back Item', type: 'back' },
     { id: 'motorcycle', name: 'Motorcycle', icon: '🛵', cost: 800, desc: 'Equippable Vehicle', type: 'vehicle' },
     { id: 'book_stack', name: 'Book Stack Hat', icon: '📚', cost: 250, desc: 'Equippable Hat', type: 'hat' },
     { id: 'glasses', name: 'Glasses', icon: '👓', cost: 150, desc: 'Equippable Face Item', type: 'face' },
     { id: 'straw_hat', name: 'Straw Hat', icon: '👒', cost: 200, desc: 'Equippable Hat', type: 'hat' },
     { id: 'suit', name: 'Suit', icon: '👔', cost: 600, desc: 'Equippable Clothing', type: 'clothing' },
-    { id: 'guitar', name: 'Guitar', icon: '🎸', cost: 700, desc: 'Equippable Hand Item', type: 'hand' },
     { id: 'stars', name: 'Starry Sky', icon: '⭐', cost: 300, desc: 'Wallpaper', type: 'wallpaper' },
   ];
 
@@ -2913,7 +2883,9 @@ function ShopCard({ userProfile, userId, theme }: { userProfile: UserProfile | n
           return (
             <div key={item.id} className={`flex items-center justify-between p-3 ${theme.secondaryBg}/50 rounded-2xl border-2 ${theme.border}/30 hover:${theme.secondaryBg} transition-colors`}>
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{item.icon}</span>
+                <div className="w-12 h-12 shrink-0 rounded-2xl bg-white border border-black/5 flex items-center justify-center shadow-sm overflow-hidden">
+                  {ITEM_PREVIEWS[item.id] || <span className="text-2xl leading-none">{item.icon}</span>}
+                </div>
                 <div>
                   <p className={`font-black text-sm ${theme.text} leading-tight`}>{item.name}</p>
                   <p className={`text-[10px] font-bold ${theme.lightText}`}>{item.desc}</p>
@@ -2946,12 +2918,11 @@ interface HabitItemProps {
   userId: string;
   userProfile: UserProfile | null;
   onEdit: (habit: Habit) => void;
-  showToast: (m: string, t?: any) => void;
   theme: any;
   key?: string;
 }
 
-  function HabitItem({ habit, checked, userId, userProfile, onEdit, showToast, theme }: HabitItemProps) {
+  function HabitItem({ habit, checked, userId, userProfile, onEdit, theme }: HabitItemProps) {
   const [showRewardAnim, setShowRewardAnim] = useState(false);
   const [rewardText, setRewardText] = useState({ exp: 0, coins: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -3003,7 +2974,6 @@ interface HabitItemProps {
         playSuccessSound();
         setShowRewardAnim(true);
         setTimeout(() => setShowRewardAnim(false), 2000);
-        showToast(`+${gainedCoins} coins, +${gainedExp} points (EXP), +1 treat!`, 'success');
 
         await setDoc(doc(db, 'checkins', checkInId), {
           id: checkInId,
@@ -3043,7 +3013,6 @@ interface HabitItemProps {
           lastHabitName: habit.name,
           mahjongToken: 1
         });
-
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'checkins');
@@ -4059,7 +4028,7 @@ function Stats({ user, theme }: { user: any, theme: any }) {
 
 function AppleTree({ user, userProfile, activeUsers, showToast }: any) {
   const [isGameActive, setIsGameActive] = useState(false);
-  const [apples, setApples] = useState<{id: number, x: number, y: number, type: 'apple' | 'bomb'}[]>([]);
+  const [apples, setApples] = useState<{id: number, x: number, y: number, vx: number, type: 'apple' | 'bomb'}[]>([]);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
 
@@ -4091,7 +4060,16 @@ function AppleTree({ user, userProfile, activeUsers, showToast }: any) {
 
     const spawner = setInterval(() => {
       const isBomb = Math.random() > 0.8; // 20% chance for a bomb
-      setApples(prev => [...prev, { id: Date.now(), x: Math.random() * 80 + 10, y: -10, type: isBomb ? 'bomb' : 'apple' }]);
+      setApples(prev => [
+        ...prev,
+        {
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          x: Math.random() * 94 + 3,
+          y: -12,
+          vx: (Math.random() - 0.5) * 0.8,
+          type: isBomb ? 'bomb' : 'apple'
+        }
+      ]);
     }, 800); // Slower spawn rate
 
     return () => {
@@ -4109,7 +4087,13 @@ function AppleTree({ user, userProfile, activeUsers, showToast }: any) {
   useEffect(() => {
     if (!isGameActive) return;
     const faller = setInterval(() => {
-      setApples(prev => prev.map(a => ({ ...a, y: a.y + 2.5 })).filter(a => a.y < 120)); // Fall slower
+      setApples(prev => prev
+        .map(a => ({
+          ...a,
+          x: Math.max(2, Math.min(98, a.x + a.vx)),
+          y: a.y + 2.5
+        }))
+        .filter(a => a.y < 120)); // Fall slower
     }, 50);
     return () => clearInterval(faller);
   }, [isGameActive]);
@@ -4164,7 +4148,7 @@ function AppleTree({ user, userProfile, activeUsers, showToast }: any) {
         )}
       </button>
 
-      {isGameActive && (
+      {isGameActive && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 pointer-events-none flex flex-col items-center justify-center">
           <div className="absolute top-10 bg-white/90 backdrop-blur-sm px-6 py-3 rounded-3xl border-4 border-red-200 shadow-xl flex items-center gap-6 pointer-events-auto">
             <div className="text-center">
@@ -4187,7 +4171,8 @@ function AppleTree({ user, userProfile, activeUsers, showToast }: any) {
               {item.type === 'bomb' ? '💣' : '🍎'}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -4195,7 +4180,6 @@ function AppleTree({ user, userProfile, activeUsers, showToast }: any) {
 
 function TownSquare({ user, userProfile, showToast, theme }: { user: any, userProfile: UserProfile | null, showToast: (m: string, t?: any) => void, theme: any }) {
   const [activeUsers, setActiveUsers] = useState<UserProfile[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     // Query users who have been active in the last 5 minutes
@@ -4317,52 +4301,52 @@ function TownSquare({ user, userProfile, showToast, theme }: { user: any, userPr
       </div>
       
       <div 
-        ref={containerRef}
-        onClick={(e) => {
-          if (!containerRef.current) return;
-          const rect = containerRef.current.getBoundingClientRect();
-          const x = ((e.clientX - rect.left) / rect.width) * 100;
-          const y = ((e.clientY - rect.top) / rect.height) * 100;
-          
-          // Don't move if clicking on a UI element (like a button or avatar)
-          if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.group')) {
-            return;
-          }
-          
-          updateDoc(doc(db, 'users', user.uid), {
-            townX: Math.max(5, Math.min(95, x)), // clamp to 5-95%
-            townY: Math.max(5, Math.min(95, y)),
-            townAction: 'idle',
-            townActionAt: new Date().toISOString()
-          }).catch(console.error);
-        }}
-        className={`relative w-full h-[50vh] sm:h-[60vh] min-h-[350px] sm:min-h-[400px] ${theme.bg} rounded-[2rem] border-4 border-white shadow-inner overflow-hidden cursor-crosshair`}
+        className="relative w-full h-[50vh] sm:h-[60vh] min-h-[350px] sm:min-h-[400px] rounded-[2rem] border-4 border-white shadow-inner overflow-hidden"
         style={{
           backgroundImage: `
-            radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 60%),
-            linear-gradient(to bottom, #e0f2fe 0%, #bae6fd 100%)
+            radial-gradient(circle at 50% 28%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 26%, rgba(255,255,255,0) 58%),
+            linear-gradient(to bottom, #cffafe 0%, #bae6fd 42%, #93c5fd 72%, #86efac 72%, #bbf7d0 100%)
           `
         }}
       >
         {/* Environment Decor */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-white/40 rounded-full blur-xl pointer-events-none" />
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-8 left-10 w-24 h-10 bg-white/70 rounded-full blur-[1px]" />
+          <div className="absolute top-14 left-20 w-32 h-12 bg-white/55 rounded-full blur-[1px]" />
+          <div className="absolute top-12 right-12 w-28 h-10 bg-white/65 rounded-full blur-[1px]" />
+          <div className="absolute top-16 right-24 w-20 h-8 bg-white/55 rounded-full blur-[1px]" />
+          <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-emerald-200/90 to-transparent" />
+          <div className="absolute bottom-10 left-[10%] w-56 h-20 bg-emerald-300/40 rounded-full blur-xl" />
+          <div className="absolute bottom-8 right-[8%] w-72 h-24 bg-lime-200/50 rounded-full blur-2xl" />
+          <div className="absolute inset-x-0 top-1/2 h-24 bg-white/20 blur-3xl" />
+          <div className="absolute top-[18%] left-[18%] w-16 h-16 rounded-full bg-yellow-200/70 blur-2xl" />
+          <div className="absolute top-[20%] right-[18%] w-14 h-14 rounded-full bg-yellow-100/60 blur-2xl" />
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-emerald-100/95 via-emerald-200/85 to-emerald-50/60 pointer-events-none" />
+        <div className="absolute bottom-[20%] left-0 w-full h-12 bg-[radial-gradient(circle_at_50%_100%,rgba(255,255,255,0.5)_0%,rgba(255,255,255,0)_70%)] pointer-events-none" />
+        <div className="absolute bottom-[18%] left-[16%] w-32 h-14 bg-emerald-400/40 rounded-full blur-sm pointer-events-none" />
+        <div className="absolute bottom-[18%] right-[12%] w-44 h-16 bg-emerald-300/40 rounded-full blur-sm pointer-events-none" />
+        <div className="absolute bottom-16 left-[42%] w-20 h-16 rounded-t-full bg-emerald-700/20 blur-[0.5px] pointer-events-none" />
+        <div className="absolute bottom-[17%] left-[42%] w-20 h-20 rounded-full bg-emerald-500/20 blur-[0.5px] pointer-events-none" />
+        <div className="absolute bottom-[15%] left-[43.5%] w-4 h-20 bg-amber-700/30 pointer-events-none" />
         
         {/* Park Zone */}
-        <div className="absolute bottom-0 left-0 w-1/3 h-1/3 bg-green-100/50 rounded-tr-full border-t-4 border-r-4 border-white/50 flex flex-col items-center justify-center pointer-events-auto">
-          <span className="text-green-600/30 font-black text-xl rotate-[-15deg] pointer-events-none absolute">Park</span>
+        <div className="absolute bottom-0 left-0 w-1/3 h-1/3 bg-gradient-to-tr from-emerald-200/60 via-lime-100/35 to-white/20 rounded-tr-full border-t-4 border-r-4 border-white/50 flex flex-col items-center justify-center pointer-events-auto backdrop-blur-[1px]">
+          <span className="text-green-700/25 font-black text-xl rotate-[-15deg] pointer-events-none absolute">Park</span>
           <AppleTree user={user} userProfile={userProfile} activeUsers={activeUsers} showToast={showToast} />
         </div>
         
         {/* Cafe Zone */}
-        <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-orange-100/50 rounded-bl-full border-b-4 border-l-4 border-white/50 flex flex-col items-center justify-center">
-          <span className="text-orange-600/30 font-black text-xl rotate-[15deg] pointer-events-none absolute">Cafe</span>
+        <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-gradient-to-bl from-amber-200/60 via-orange-100/35 to-white/10 rounded-bl-full border-b-4 border-l-4 border-white/50 flex flex-col items-center justify-center backdrop-blur-[1px]">
+          <span className="text-orange-700/25 font-black text-xl rotate-[15deg] pointer-events-none absolute">Cafe</span>
           <MahjongTable currentUser={user} currentUserProfile={userProfile} activeUsers={activeUsers} theme={theme} />
         </div>
 
         {/* Central Fountain (Visual only) */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-blue-200/50 rounded-full border-4 border-white/80 flex items-center justify-center pointer-events-none">
-          <div className="w-16 h-16 bg-blue-300/50 rounded-full flex items-center justify-center">
-            <div className="w-8 h-8 bg-blue-400/50 rounded-full animate-ping" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-white/35 rounded-full border-4 border-white/70 flex items-center justify-center pointer-events-none shadow-[0_0_0_12px_rgba(255,255,255,0.08)]">
+          <div className="w-20 h-20 bg-sky-300/50 rounded-full flex items-center justify-center shadow-inner">
+            <div className="w-9 h-9 bg-sky-400/55 rounded-full animate-pulse" />
           </div>
         </div>
 
@@ -4801,27 +4785,23 @@ function Buddy({ user, userProfile, showToast, theme }: { user: any, userProfile
   const [selectedBuddyId, setSelectedBuddyId] = useState<string | null>(null);
 
   const { data: friendsProfiles } = useFirestoreCollection<UserProfile>('users', useMemo(() => 
-    (userProfile?.friends?.length || 0) > 0 ? [where(documentId(), 'in', userProfile!.friends!.slice(0, 10))] : []
+    (userProfile?.friends?.length || 0) > 0 ? [where('uid', 'in', userProfile!.friends!.slice(0, 10))] : []
   , [userProfile?.friends]), !!userProfile?.friends?.length);
 
   const { data: incomingRequestsProfiles } = useFirestoreCollection<UserProfile>('users', useMemo(() => 
-    (userProfile?.buddyRequestsReceived?.length || 0) > 0 ? [where(documentId(), 'in', userProfile!.buddyRequestsReceived!.slice(0, 10))] : []
+    (userProfile?.buddyRequestsReceived?.length || 0) > 0 ? [where('uid', 'in', userProfile!.buddyRequestsReceived!.slice(0, 10))] : []
   , [userProfile?.buddyRequestsReceived]), !!userProfile?.buddyRequestsReceived?.length);
 
   const handleSearch = async () => {
     if (!searchEmail.trim()) return;
     setLoading(true);
     try {
-      const normalizedEmail = searchEmail.trim().toLowerCase();
-      const q = query(collection(db, 'userDirectory'), where('emailLower', '==', normalizedEmail), limit(1));
+      const q = query(collection(db, 'users'), where('email', '==', searchEmail.trim()), limit(1));
       const snapshot = await getDocs(q);
       const results = snapshot.docs.map(doc => doc.data() as UserProfile).filter(u => u.uid !== user.uid);
       setSearchResults(results);
-      if (results.length === 0) {
-        showToast("No user found with that email.", 'info');
-      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, 'userDirectory');
+      handleFirestoreError(err, OperationType.LIST, 'users');
     } finally {
       setLoading(false);
     }
@@ -5081,20 +5061,15 @@ function BuddyChat({ user, buddyId, userProfile, onBack, onUnfriend, showToast, 
   const [showUnfriendConfirm, setShowUnfriendConfirm] = useState(false);
   const today = format(startOfToday(), 'yyyy-MM-dd');
 
-  const { data: sentMessages } = useFirestoreCollection<Message>('messages', useMemo(() => (user?.uid && buddyId) ? [
-    where('fromUid', '==', user.uid),
-    where('toUid', '==', buddyId)
-  ] : [], [user?.uid, buddyId]), !!user && !!buddyId);
-
-  const { data: receivedMessages } = useFirestoreCollection<Message>('messages', useMemo(() => (user?.uid && buddyId) ? [
-    where('fromUid', '==', buddyId),
-    where('toUid', '==', user.uid)
+  const { data: rawMessages } = useFirestoreCollection<Message>('messages', useMemo(() => (user?.uid && buddyId) ? [
+    where('fromUid', 'in', [user?.uid, buddyId])
   ] : [], [user?.uid, buddyId]), !!user && !!buddyId);
 
   const messages = useMemo(() => {
-    return [...sentMessages, ...receivedMessages]
+    return rawMessages
+      .filter(m => (m.fromUid === user?.uid && m.toUid === buddyId) || (m.fromUid === buddyId && m.toUid === user?.uid))
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [sentMessages, receivedMessages]);
+  }, [rawMessages, user?.uid, buddyId]);
 
   const { data: buddyHabits } = useFirestoreCollection<Habit>('habits', useMemo(() => buddyId ? [where('userId', '==', buddyId), where('isShared', '==', true)] : [], [buddyId]), !!user && !!buddyId);
   const { data: allBuddyCheckins } = useFirestoreCollection<CheckIn>('checkins', useMemo(() => buddyId ? [where('userId', '==', buddyId)] : [], [buddyId]), !!user && !!buddyId);
@@ -5652,6 +5627,44 @@ function SettingsScreen({ user, userProfile, notificationsEnabled, setNotificati
     usagi: 'Usagi'
   };
 
+  const notificationPermission = typeof window !== 'undefined' && 'Notification' in window
+    ? Notification.permission
+    : 'unsupported';
+
+  const handleNotificationToggle = async () => {
+    playClickSound();
+
+    if (!('Notification' in window)) {
+      showToast('Notifications are not supported in this browser.', 'error');
+      return;
+    }
+
+    if (notificationPermission === 'denied') {
+      showToast('Notifications are blocked. Open your browser site settings and allow notifications for this app.', 'error');
+      setNotificationsEnabled(false);
+      return;
+    }
+
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false);
+      showToast('Push notifications turned off.', 'info');
+      return;
+    }
+
+    const permission = notificationPermission === 'granted'
+      ? 'granted'
+      : await Notification.requestPermission();
+
+    if (permission === 'granted') {
+      setNotificationsEnabled(true);
+      showToast('Push notifications turned on.', 'success');
+      return;
+    }
+
+    setNotificationsEnabled(false);
+    showToast('Permission denied. Enable notifications in browser site settings.', 'error');
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -5716,19 +5729,14 @@ function SettingsScreen({ user, userProfile, notificationsEnabled, setNotificati
           <div>
             <h3 className="text-sm font-black text-gray-400">Push Notifications</h3>
             <p className="text-[10px] font-bold text-gray-400">Get reminders for habits and buddy nudges</p>
+            <p className="text-[10px] font-bold text-gray-400 mt-1">
+              Status: {notificationPermission === 'unsupported' ? 'Unsupported' : notificationPermission === 'granted' ? (notificationsEnabled ? 'Enabled' : 'Allowed, but off') : 'Blocked'}
+            </p>
           </div>
           <button 
-            onClick={() => {
-              playClickSound();
-              if (!notificationsEnabled && 'Notification' in window) {
-                Notification.requestPermission().then(permission => {
-                  if (permission === 'granted') setNotificationsEnabled(true);
-                });
-              } else {
-                setNotificationsEnabled(!notificationsEnabled);
-              }
-            }}
-            className={`w-12 h-6 rounded-full transition-all relative ${notificationsEnabled ? theme.buttonBg : 'bg-gray-200'}`}
+            onClick={handleNotificationToggle}
+            disabled={notificationPermission === 'unsupported'}
+            className={`w-12 h-6 rounded-full transition-all relative ${notificationsEnabled ? theme.buttonBg : 'bg-gray-200'} ${notificationPermission === 'unsupported' ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <motion.div 
               animate={{ x: notificationsEnabled ? 24 : 4 }}
