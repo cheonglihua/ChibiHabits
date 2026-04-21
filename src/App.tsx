@@ -799,6 +799,7 @@ function AppContent() {
   const [showLogoutWarning, setShowLogoutWarning] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
 
   const handleLinkAccount = async () => {
     if (!user) return;
@@ -821,9 +822,23 @@ function AppContent() {
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, 3000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const { data: habits, loading: habitsLoading } = useFirestoreCollection<Habit>('habits', useMemo(() => user?.uid ? [where('userId', '==', user.uid)] : [], [user?.uid]), !!user);
   const { today, yesterday, ninetyDaysAgo } = useToday();
@@ -1735,15 +1750,15 @@ function ChiikawaToast({ message, type, onClose }: { message: string, type: 'suc
 
   return (
     <motion.div
-      initial={{ y: 100, opacity: 0 }}
-      animate={{ y: -20, opacity: 1 }}
-      exit={{ y: 100, opacity: 0 }}
-      className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-full text-white font-black text-xs shadow-xl flex items-center gap-3 ${bgColors[type]}`}
+      initial={{ y: -30, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: -30, opacity: 0 }}
+      className={`fixed top-6 left-1/2 -translate-x-1/2 z-[300] max-w-[92vw] px-6 py-3 rounded-full text-white font-black text-xs shadow-xl flex items-center gap-3 ${bgColors[type]}`}
     >
       {type === 'success' && <Check size={16} />}
       {type === 'error' && <X size={16} />}
       {type === 'info' && <Sparkles size={16} />}
-      <span className="whitespace-nowrap">{message}</span>
+      <span>{message}</span>
     </motion.div>
   );
 }
@@ -2168,6 +2183,7 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                 userId={user.uid}
                 userProfile={userProfile}
                 onEdit={setEditingHabit}
+                showToast={showToast}
                 theme={theme}
               />
             ))}
@@ -2182,6 +2198,7 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                     userId={user.uid}
                     userProfile={userProfile}
                     onEdit={setEditingHabit}
+                    showToast={showToast}
                     theme={theme}
                   />
                 ))}
@@ -2210,6 +2227,7 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                 userId={user.uid}
                 userProfile={userProfile}
                 onEdit={setEditingHabit}
+                showToast={showToast}
                 theme={theme}
               />
             ))}
@@ -2224,6 +2242,7 @@ function Dashboard({ user, userProfile, habits, checkins, habitsLoading, setShow
                     userId={user.uid}
                     userProfile={userProfile}
                     onEdit={setEditingHabit}
+                    showToast={showToast}
                     theme={theme}
                   />
                 ))}
@@ -2797,11 +2816,12 @@ interface HabitItemProps {
   userId: string;
   userProfile: UserProfile | null;
   onEdit: (habit: Habit) => void;
+  showToast: (m: string, t?: any) => void;
   theme: any;
   key?: string;
 }
 
-  function HabitItem({ habit, checked, userId, userProfile, onEdit, theme }: HabitItemProps) {
+  function HabitItem({ habit, checked, userId, userProfile, onEdit, showToast, theme }: HabitItemProps) {
   const [showRewardAnim, setShowRewardAnim] = useState(false);
   const [rewardText, setRewardText] = useState({ exp: 0, coins: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -2853,6 +2873,7 @@ interface HabitItemProps {
         playSuccessSound();
         setShowRewardAnim(true);
         setTimeout(() => setShowRewardAnim(false), 2000);
+        showToast(`+${gainedCoins} coins, +${gainedExp} points (EXP), +1 treat!`, 'success');
 
         await setDoc(doc(db, 'checkins', checkInId), {
           id: checkInId,
@@ -2892,6 +2913,7 @@ interface HabitItemProps {
           lastHabitName: habit.name,
           mahjongToken: 1
         });
+
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'checkins');
