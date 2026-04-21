@@ -1,6 +1,7 @@
 export interface UserProfile {
   uid: string;
   email: string;
+  emailLower?: string;
   displayName?: string;
   photoURL?: string;
   buddyId?: string; // Current mutual buddy

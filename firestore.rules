@@ -126,6 +126,16 @@ service cloud.firestore {
       );
     }
 
+    match /userDirectory/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if (isOwner(userId) || isAdmin()) &&
+        incoming().uid == userId &&
+        incoming().uid is string &&
+        incoming().email is string &&
+        incoming().emailLower is string;
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
     match /habits/{habitId} {
       allow read: if isSignedIn() && (isOwner(existing().userId) || isAdmin() || (isBuddy(existing().userId) && existing().isShared == true));
       allow create: if isSignedIn() && isValidId(habitId) && isValidHabit(incoming());

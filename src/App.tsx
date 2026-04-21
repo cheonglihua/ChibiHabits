@@ -3,6 +3,7 @@ import {
   collection, 
   query, 
   where, 
+  documentId,
   onSnapshot, 
   doc, 
   setDoc, 
@@ -696,6 +697,7 @@ function CharacterSelectionScreen({ user, onComplete, onError }: { user: any, on
     const newProfile: UserProfile = {
       uid: user.uid,
       email: user.email || '',
+      emailLower: (user.email || '').trim().toLowerCase(),
       displayName: initialDisplayName,
       photoURL: user.photoURL || '',
       petExp: 0,
@@ -704,6 +706,18 @@ function CharacterSelectionScreen({ user, onComplete, onError }: { user: any, on
     };
     try {
       await setDoc(doc(db, 'users', user.uid), newProfile);
+      if (newProfile.emailLower) {
+        await setDoc(doc(db, 'userDirectory', user.uid), {
+          uid: user.uid,
+          email: newProfile.email,
+          emailLower: newProfile.emailLower,
+          displayName: newProfile.displayName || initialDisplayName,
+          photoURL: newProfile.photoURL || '',
+          character: newProfile.character,
+          petLevel: newProfile.petLevel,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'users');
       onError();
@@ -800,13 +814,39 @@ function AppContent() {
   const [isLinking, setIsLinking] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const activeTabRef = useRef(activeTab);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   const handleLinkAccount = async () => {
     if (!user) return;
     setIsLinking(true);
     try {
       const provider = new GoogleAuthProvider();
-      await linkWithPopup(user, provider);
+      const linked = await linkWithPopup(user, provider);
+      const linkedEmail = linked.user.email || user.email || '';
+      const normalizedEmail = linkedEmail.trim().toLowerCase();
+
+      if (normalizedEmail) {
+        await updateDoc(doc(db, 'users', user.uid), {
+          email: linkedEmail,
+          emailLower: normalizedEmail
+        });
+
+        await setDoc(doc(db, 'userDirectory', user.uid), {
+          uid: user.uid,
+          email: linkedEmail,
+          emailLower: normalizedEmail,
+          displayName: linked.user.displayName || userProfile?.displayName || normalizedEmail.split('@')[0],
+          photoURL: linked.user.photoURL || userProfile?.photoURL || '',
+          character: userProfile?.character || 'chiikawa',
+          petLevel: userProfile?.petLevel || 1,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
       showToast('Account linked successfully! 💖', 'success');
       setShowLogoutWarning(false);
     } catch (err: any) {
@@ -840,6 +880,41 @@ function AppContent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user || !userProfile) return;
+
+    const profileEmail = userProfile.email || user.email || '';
+    const normalizedEmail = profileEmail.trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    const syncDirectory = async () => {
+      try {
+        await setDoc(doc(db, 'userDirectory', user.uid), {
+          uid: user.uid,
+          email: profileEmail,
+          emailLower: normalizedEmail,
+          displayName: userProfile.displayName || user.displayName || normalizedEmail.split('@')[0],
+          photoURL: userProfile.photoURL || user.photoURL || '',
+          character: userProfile.character || 'chiikawa',
+          petLevel: userProfile.petLevel || 1,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        if (userProfile.emailLower !== normalizedEmail || userProfile.email !== profileEmail) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            email: profileEmail,
+            emailLower: normalizedEmail
+          });
+        }
+      } catch (err) {
+        // Directory sync should not block core app behavior.
+        console.error('Failed to sync user directory', err);
+      }
+    };
+
+    syncDirectory();
+  }, [user, userProfile]);
+
   const { data: habits, loading: habitsLoading } = useFirestoreCollection<Habit>('habits', useMemo(() => user?.uid ? [where('userId', '==', user.uid)] : [], [user?.uid]), !!user);
   const { today, yesterday, ninetyDaysAgo } = useToday();
   const { data: allCheckins, loading: checkinsLoading } = useFirestoreCollection<CheckIn>('checkins', useMemo(() => user?.uid ? [where('userId', '==', user.uid)] : [], [user?.uid]), !!user);
@@ -870,82 +945,40 @@ function AppContent() {
 
   // --- Notification System ---
   useEffect(() => {
-    if (!user || !notificationsEnabled || !('Notification' in window)) return;
+    if (!user) return;
 
-    // Request permission if not granted
-    if (Notification.permission === 'default') {
+    const canUseBrowserNotifications = 'Notification' in window;
+    if (notificationsEnabled && canUseBrowserNotifications && Notification.permission === 'default') {
       Notification.requestPermission().catch(console.error);
     }
 
-    // 1. Listen for Nudges
-    const nudgeQuery = query(
-      collection(db, 'nudges'), 
-      where('toUid', '==', user.uid)
-    );
+    let unsubscribeNudges = () => {};
+    let reminderInterval: ReturnType<typeof setInterval> | null = null;
 
-    const now = new Date().toISOString();
-    const unsubscribeNudges = onSnapshot(nudgeQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const nudge = change.doc.data() as Nudge;
-          // Filter in memory to avoid index requirement
-          if (nudge.createdAt <= now) return;
-          
-          playNotificationSound();
-          if (Notification.permission === 'granted') {
-            const title = 'Buddy Nudge! ✨';
-            const options = {
-              body: nudge.type === 'cheer' ? "Your buddy is cheering you on! Keep it up! 💖" : "Your buddy sent you a gentle reminder! 🌸",
-              icon: '/favicon.ico',
-              badge: '/favicon.ico'
-            };
+    if (notificationsEnabled) {
+      // 1. Listen for Nudges
+      const nudgeQuery = query(
+        collection(db, 'nudges'), 
+        where('toUid', '==', user.uid)
+      );
 
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.ready.then(registration => {
-                registration.showNotification(title, options);
-              });
-            } else {
-              new Notification(title, options);
-            }
-          }
-        }
-      });
-    });
-
-    // 2. Listen for Buddy Requests (via profile changes)
-    // This is already handled by the userProfile listener, but we can add a specific effect if we want a notification
-    
-    // 3. Habit Reminders (Local check every minute)
-    const reminderInterval = setInterval(() => {
-      const now = new Date();
-      const currentTime = format(now, 'HH:mm');
-      const timePlus30 = format(addMinutes(now, 30), 'HH:mm');
-      const todayDay = format(now, 'EEE'); // Mon, Tue...
-
-      habits.forEach(habit => {
-        // Check for exact reminder time OR 30 minutes before habitTime
-        const isReminderTime = habit.reminderTime === currentTime;
-        const is30MinBefore = habit.habitTime === timePlus30;
-
-        if (isReminderTime || is30MinBefore) {
-          const isScheduledToday = habit.schedule.includes('Every Day') || habit.schedule.includes(todayDay);
-          const isCompleted = checkins.some(c => c.habitId === habit.id && c.completed);
-
-          if (isScheduledToday && !isCompleted) {
+      const now = new Date().toISOString();
+      unsubscribeNudges = onSnapshot(nudgeQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const nudge = change.doc.data() as Nudge;
+            // Filter in memory to avoid index requirement
+            if (nudge.createdAt <= now) return;
+            
             playNotificationSound();
-            if (Notification.permission === 'granted') {
-              const title = is30MinBefore ? `Upcoming Habit: ${habit.name}` : `Habit Reminder: ${habit.name}`;
-              const body = is30MinBefore 
-                ? `Starts in 30 minutes! Get ready! 🌸` 
-                : "Time to keep your streak alive! Your buddy is watching! 🐾";
-
+            if (canUseBrowserNotifications && Notification.permission === 'granted') {
+              const title = 'Buddy Nudge! ✨';
               const options = {
-                body,
+                body: nudge.type === 'cheer' ? "Your buddy is cheering you on! Keep it up! 💖" : "Your buddy sent you a gentle reminder! 🌸",
                 icon: '/favicon.ico',
                 badge: '/favicon.ico'
               };
 
-              // Try using service worker for more robust notifications
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.ready.then(registration => {
                   registration.showNotification(title, options);
@@ -955,13 +988,110 @@ function AppContent() {
               }
             }
           }
+        });
+      });
+    }
+
+    // 2. Listen for incoming buddy messages
+    const messageQuery = query(
+      collection(db, 'messages'),
+      where('toUid', '==', user.uid)
+    );
+
+    let isInitialMessageSnapshot = true;
+    const unsubscribeMessages = onSnapshot(messageQuery, (snapshot) => {
+      if (isInitialMessageSnapshot) {
+        isInitialMessageSnapshot = false;
+        return;
+      }
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== 'added') return;
+
+        const incoming = change.doc.data() as Message;
+        // If user is currently in chat tab, avoid double-noise.
+        if (activeTabRef.current === 'buddy') return;
+
+        playNotificationSound();
+        showToast('New buddy message received! 💬', 'info');
+
+        if (canUseBrowserNotifications && Notification.permission === 'granted') {
+          const title = 'New Buddy Message 💬';
+          const preview = incoming.text?.trim() || 'Open chat to read the message.';
+          const body = preview.length > 80 ? `${preview.slice(0, 80)}...` : preview;
+
+          const options = {
+            body,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico'
+          };
+
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+              registration.showNotification(title, options);
+            });
+          } else {
+            new Notification(title, options);
+          }
         }
       });
-    }, 60000);
+    });
+
+    // 3. Listen for Buddy Requests (via profile changes)
+    // This is already handled by the userProfile listener, but we can add a specific effect if we want a notification
+    
+    // 4. Habit Reminders (Local check every minute)
+    if (notificationsEnabled) {
+      reminderInterval = setInterval(() => {
+        const now = new Date();
+        const currentTime = format(now, 'HH:mm');
+        const timePlus30 = format(addMinutes(now, 30), 'HH:mm');
+        const todayDay = format(now, 'EEE'); // Mon, Tue...
+
+        habits.forEach(habit => {
+          // Check for exact reminder time OR 30 minutes before habitTime
+          const isReminderTime = habit.reminderTime === currentTime;
+          const is30MinBefore = habit.habitTime === timePlus30;
+
+          if (isReminderTime || is30MinBefore) {
+            const isScheduledToday = habit.schedule.includes('Every Day') || habit.schedule.includes(todayDay);
+            const isCompleted = checkins.some(c => c.habitId === habit.id && c.completed);
+
+            if (isScheduledToday && !isCompleted) {
+              playNotificationSound();
+              if (canUseBrowserNotifications && Notification.permission === 'granted') {
+                const title = is30MinBefore ? `Upcoming Habit: ${habit.name}` : `Habit Reminder: ${habit.name}`;
+                const body = is30MinBefore 
+                  ? `Starts in 30 minutes! Get ready! 🌸` 
+                  : "Time to keep your streak alive! Your buddy is watching! 🐾";
+
+                const options = {
+                  body,
+                  icon: '/favicon.ico',
+                  badge: '/favicon.ico'
+                };
+
+                // Try using service worker for more robust notifications
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification(title, options);
+                  });
+                } else {
+                  new Notification(title, options);
+                }
+              }
+            }
+          }
+        });
+      }, 60000);
+    }
 
     return () => {
       unsubscribeNudges();
-      clearInterval(reminderInterval);
+      unsubscribeMessages();
+      if (reminderInterval) {
+        clearInterval(reminderInterval);
+      }
     };
   }, [user, notificationsEnabled, habits, checkins]);
 
@@ -4671,23 +4801,27 @@ function Buddy({ user, userProfile, showToast, theme }: { user: any, userProfile
   const [selectedBuddyId, setSelectedBuddyId] = useState<string | null>(null);
 
   const { data: friendsProfiles } = useFirestoreCollection<UserProfile>('users', useMemo(() => 
-    (userProfile?.friends?.length || 0) > 0 ? [where('uid', 'in', userProfile!.friends!.slice(0, 10))] : []
+    (userProfile?.friends?.length || 0) > 0 ? [where(documentId(), 'in', userProfile!.friends!.slice(0, 10))] : []
   , [userProfile?.friends]), !!userProfile?.friends?.length);
 
   const { data: incomingRequestsProfiles } = useFirestoreCollection<UserProfile>('users', useMemo(() => 
-    (userProfile?.buddyRequestsReceived?.length || 0) > 0 ? [where('uid', 'in', userProfile!.buddyRequestsReceived!.slice(0, 10))] : []
+    (userProfile?.buddyRequestsReceived?.length || 0) > 0 ? [where(documentId(), 'in', userProfile!.buddyRequestsReceived!.slice(0, 10))] : []
   , [userProfile?.buddyRequestsReceived]), !!userProfile?.buddyRequestsReceived?.length);
 
   const handleSearch = async () => {
     if (!searchEmail.trim()) return;
     setLoading(true);
     try {
-      const q = query(collection(db, 'users'), where('email', '==', searchEmail.trim()), limit(1));
+      const normalizedEmail = searchEmail.trim().toLowerCase();
+      const q = query(collection(db, 'userDirectory'), where('emailLower', '==', normalizedEmail), limit(1));
       const snapshot = await getDocs(q);
       const results = snapshot.docs.map(doc => doc.data() as UserProfile).filter(u => u.uid !== user.uid);
       setSearchResults(results);
+      if (results.length === 0) {
+        showToast("No user found with that email.", 'info');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, 'users');
+      handleFirestoreError(err, OperationType.LIST, 'userDirectory');
     } finally {
       setLoading(false);
     }
@@ -4947,15 +5081,20 @@ function BuddyChat({ user, buddyId, userProfile, onBack, onUnfriend, showToast, 
   const [showUnfriendConfirm, setShowUnfriendConfirm] = useState(false);
   const today = format(startOfToday(), 'yyyy-MM-dd');
 
-  const { data: rawMessages } = useFirestoreCollection<Message>('messages', useMemo(() => (user?.uid && buddyId) ? [
-    where('fromUid', 'in', [user?.uid, buddyId])
+  const { data: sentMessages } = useFirestoreCollection<Message>('messages', useMemo(() => (user?.uid && buddyId) ? [
+    where('fromUid', '==', user.uid),
+    where('toUid', '==', buddyId)
+  ] : [], [user?.uid, buddyId]), !!user && !!buddyId);
+
+  const { data: receivedMessages } = useFirestoreCollection<Message>('messages', useMemo(() => (user?.uid && buddyId) ? [
+    where('fromUid', '==', buddyId),
+    where('toUid', '==', user.uid)
   ] : [], [user?.uid, buddyId]), !!user && !!buddyId);
 
   const messages = useMemo(() => {
-    return rawMessages
-      .filter(m => (m.fromUid === user?.uid && m.toUid === buddyId) || (m.fromUid === buddyId && m.toUid === user?.uid))
+    return [...sentMessages, ...receivedMessages]
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [rawMessages, user?.uid, buddyId]);
+  }, [sentMessages, receivedMessages]);
 
   const { data: buddyHabits } = useFirestoreCollection<Habit>('habits', useMemo(() => buddyId ? [where('userId', '==', buddyId), where('isShared', '==', true)] : [], [buddyId]), !!user && !!buddyId);
   const { data: allBuddyCheckins } = useFirestoreCollection<CheckIn>('checkins', useMemo(() => buddyId ? [where('userId', '==', buddyId)] : [], [buddyId]), !!user && !!buddyId);
