@@ -1,89 +1,70 @@
-# ChibiHabits
+# 🐾 ChibiHabits
 
-ChibiHabits is a gamified habit tracker inspired by Chiikawa. Build routines, level up your companion, and stay accountable with your buddy.
+**ChibiHabits** is an adorable, gamified habit tracker designed to help you build better routines with the help of cute companions. Inspired by "Chiikawa," the app transforms habit building into a social adventure where you care for pets, earn rewards, and support your buddies.
 
-## Live App
+## ✨ Features
 
-https://chibihabits.web.app
+- **Gamified Habit Tracking**: Earn EXP for your pet and coins for yourself by completing daily and one-time tasks.
+- **Pet Care & Evolution**: Level up your pet (Chiikawa, Hachiware, or Usagi). Watch them grow and thrive as you stay consistent.
+- **Buddy System**: Link up with a friend! Nudge them when they're falling behind and celebrate milestones together.
+- **The Town Square**: See your friends' avatars in a live virtual town, wave to them, and see what habits they're currently working on.
+- **Item Shop**: Spend your hard-earned coins on cute accessories and furniture for your character.
 
-## Features
+## 🛠 Tech Stack
 
-- Gamified habit tracking with EXP and coins
-- Pet growth and progression
-- Buddy accountability and nudges
-- Shared social town experience
-- Rewards and shop system
+- **Frontend**: React (Web) / React Native & Expo (Mobile)
+- **Styling**: Tailwind CSS / NativeWind
+- **Backend**: Firebase (Firestore, Authentication, Analytics, Messaging)
+- **Animations**: Framer Motion / Moti
+- **Icons**: Lucide React
 
-## Tech Stack
-
-- Frontend: React + TypeScript + Vite
-- Backend: Firebase (Firestore, Authentication, Analytics, Messaging)
-- UI: Tailwind CSS, Lucide React, Motion
-
-## Getting Started
+## 🚀 Getting Started (Local Development)
 
 ### Prerequisites
+- Node.js (v18+)
+- Firebase CLI (`npm install -g firebase-tools`)
 
-- Node.js 18+
-- npm
-- Firebase CLI (`npm install -g firebase-tools`) for deployment
+### Setup
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/chibihabits.git
+   cd chibihabits
+   ```
 
-### 1. Install dependencies
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-```bash
-npm install
-```
+3. **Firebase Setup**:
+   - Create a project at [Firebase Console](https://console.firebase.google.com/).
+   - Enable **Firestore**, **Authentication** (Google, Email), and **Hosting**.
+   - Copy your Firebase config into `firebase-applet-config.json`.
+   - For web push notifications, add `VITE_FIREBASE_VAPID_KEY` to your `.env.local` file (from Firebase Console -> Cloud Messaging -> Web Push certificates).
 
-### 2. Configure environment variables
+4. **Run the app**:
+   ```bash
+   npm run dev
+   ```
 
-Create a .env file from .env.example and fill in your Firebase web config values:
+## 📦 Deployment
 
-```bash
-# PowerShell (Windows)
-Copy-Item .env.example .env
-
-# macOS / Linux
-cp .env.example .env
-```
-
-Required Vite Firebase variables:
-
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_FIREBASE_MEASUREMENT_ID`
-- `VITE_FIREBASE_FIRESTORE_DATABASE_ID` (use `(default)` unless you configured a named database)
-
-### 3. Run locally
-
-```bash
-npm run dev
-```
-
-App runs at `http://localhost:3000`.
-
-## Deployment
-
-### Firebase Hosting
-
-Production URL: https://chibihabits.web.app
-
+### Web (Firebase Hosting)
 ```bash
 npm run build
 firebase deploy
 ```
 
-## Security
+### Mobile (Expo)
+To build for iOS and Android:
+1. Initialize EAS: `eas build:configure`
+2. Build: `eas build --platform all`
 
-Firestore rules are defined in `firestore.rules`, including:
+## 🛡 Security
+Security rules are predefined in `firestore.rules`. These include:
+- **Identity Protection**: Users can only modify their own data.
+- **Buddy Privacy**: Only linked buddies can see each other's shared habits.
+- **Input Validation**: Strict schema enforcement to prevent database poisoning.
 
-- Per-user access controls
-- Buddy-sharing access restrictions
-- Input validation safeguards
-
-## License
-
-MIT
+## 📜 License
+MIT License - feel free to use and remix!

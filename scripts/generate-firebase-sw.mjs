@@ -4,8 +4,20 @@ import dotenv from 'dotenv';
 
 const rootDir = process.cwd();
 
-dotenv.config({ path: path.join(rootDir, '.env') });
-dotenv.config({ path: path.join(rootDir, '.env.local'), override: true });
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+
+  return dotenv.parse(fs.readFileSync(filePath));
+}
+
+const baseEnv = loadEnvFile(path.join(rootDir, '.env'));
+const localEnv = loadEnvFile(path.join(rootDir, '.env.local'));
+const env = {
+  ...baseEnv,
+  ...localEnv,
+};
 
 const requiredEnvKeys = [
   'VITE_FIREBASE_API_KEY',
@@ -17,7 +29,7 @@ const requiredEnvKeys = [
   'VITE_FIREBASE_MEASUREMENT_ID',
 ];
 
-const missingKeys = requiredEnvKeys.filter((key) => !process.env[key]);
+const missingKeys = requiredEnvKeys.filter((key) => !env[key]);
 if (missingKeys.length > 0) {
   throw new Error(`Missing Firebase environment variables: ${missingKeys.join(', ')}`);
 }
@@ -28,12 +40,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: ${JSON.stringify(process.env.VITE_FIREBASE_API_KEY)},
-  authDomain: ${JSON.stringify(process.env.VITE_FIREBASE_AUTH_DOMAIN)},
-  projectId: ${JSON.stringify(process.env.VITE_FIREBASE_PROJECT_ID)},
-  storageBucket: ${JSON.stringify(process.env.VITE_FIREBASE_STORAGE_BUCKET)},
-  messagingSenderId: ${JSON.stringify(process.env.VITE_FIREBASE_MESSAGING_SENDER_ID)},
-  appId: ${JSON.stringify(process.env.VITE_FIREBASE_APP_ID)}
+  apiKey: ${JSON.stringify(env.VITE_FIREBASE_API_KEY)},
+  authDomain: ${JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN)},
+  projectId: ${JSON.stringify(env.VITE_FIREBASE_PROJECT_ID)},
+  storageBucket: ${JSON.stringify(env.VITE_FIREBASE_STORAGE_BUCKET)},
+  messagingSenderId: ${JSON.stringify(env.VITE_FIREBASE_MESSAGING_SENDER_ID)},
+  appId: ${JSON.stringify(env.VITE_FIREBASE_APP_ID)}
 });
 
 const messaging = firebase.messaging();
